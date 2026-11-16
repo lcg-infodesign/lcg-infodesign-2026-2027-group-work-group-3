@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- sfondo -->
+  <meta name="theme-color" content="#090e0f">
+  <meta name="description" content="SATELLITI — Visualizzazione dei satelliti operativi e della loro crescita nel tempo.">
+  <title>SATELLITI</title>
+
+  <!-- font da Google Fonts-->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=array@400,600,700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js" defer></script> <!-- p5.js = la libreria utilizzata -->
+  <script src="data.js" defer></script>
+  <script src="sketch.js" defer></script>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-symbol">✳</span> SATELLITI</div>
+    <nav class="topnav">
+      <a href="#">HOMEPAGE</a>
+      <a href="#">ABOUT</a>
+      <a href="#">TEAM</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="intro">
+      <div>
+        <p class="eyebrow"><span class="accent-index">01 /</span> PANORAMICA DEL SISTEMA SATELLITARE</p>
+        <h1 class="dot-title">SATELLITI</h1>
+      </div>
+      <div class="intro-right">
+        <span class="metric-caption">SATELLITI VISUALIZZATI</span>
+        <strong id="visibleCount" class="metric-value">0</strong>
+      </div>
+    </section>
+
+    <section class="visual">
+      <div class="visual-head">
+        <span>L'ARCHITETTURA DELLE ORBITE</span>
+        <span class="dim">VISTA SCHEMATICA / NON IN SCALA</span>
+      </div>
+      <div class="orbit-surface" id="orbitSurface">
+        <div class="surface-cross surface-cross-a">+</div>
+        <div class="surface-cross surface-cross-b">+</div>
+
+        <!-- Lista delle orbite e legenda categorie-->
+        <div class="side-keys">
+          <div class="orbit-key">
+            <div><strong>HEO</strong><span>HIGH ELLIPTICAL</span></div>
+            <div><strong>GEO</strong><span>GEOSTATIONARY</span></div>
+            <div><strong>MEO</strong><span>MEDIUM EARTH</span></div>
+            <div><strong>LEO</strong><span>LOW EARTH</span></div>
+          </div>
+          <div class="legend">
+            <div class="legend-heading">TIPOLOGIA D'USO</div>
+            <div class="legend-list">
+              <div><i style="--swatch:#93c572"></i><span>COMMERCIALE</span></div>
+              <div><i style="--swatch:#6894e9"></i><span>GOVERNATIVO</span></div>
+              <div><i style="--swatch:#ed8395"></i><span>MILITARE</span></div>
+              <div><i style="--swatch:#c49ce7"></i><span>CIVILE</span></div>
+              <div><i style="--swatch:#57d0bd"></i><span>ALTRO</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="plot-note">1 PUNTO = 1 SATELLITE <span class="dim">/ POSIZIONI SIMBOLICHE</span></div>
+      </div>
+    </section>
+
+    <section class="timeline">
+      <div class="timeline-top">
+        <h2><span class="accent-index">02 /</span> TIMELINE DEI LANCI</h2>
+        <div class="timeline-actions">
+          <button id="playButton" class="play-button" type="button"><span id="playIcon">▶</span> <span id="playLabel">PLAY</span></button>
+          <output id="yearOutput" class="year-value" for="yearSlider">2023</output>
+        </div>
+      </div>
+      <div class="range-wrap">
+        <input id="yearSlider" type="range" min="1957" max="2023" step="1" value="2023" aria-label="Anno di lancio massimo da visualizzare">
+        <div class="year-ticks">
+          <span style="--tick:0%">1957</span>
+          <span style="--tick:19.7%">1970</span>
+          <span style="--tick:42.4%">1985</span>
+          <span style="--tick:65.2%">2000</span>
+          <span style="--tick:87.9%">2015</span>
+          <span style="--tick:100%">2023</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="dropOverlay" class="drop-overlay" hidden><span>RILASCIA IL FILE CSV PER CARICARE IL DATABASE</span></div>
+</body>
+</html>
