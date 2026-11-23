@@ -18,6 +18,32 @@ let zoomPoints = [];
 let hoverSatellite = null;
 let detailSatellite = null;
 
+// Posizioni dei satelliti disegnati nella homepage, usate per hover e clic.
+let homePoints = [];
+
+// Aree cliccabili dei nomi delle orbite nella homepage (una per etichetta).
+let homeLabels = [];
+
+// Nome dell'orbita sotto il puntatore nella homepage (null se nessuno).
+let hoverLabel = null;
+
+// Paese selezionato nel menu laterale: "tutti" oppure una chiave di countryGroup().
+let selectedCountry = "tutti";
+
+// Velocità di rotazione dei satelliti nella vista di un'orbita.
+// Uguale per tutte le orbite: aumentare questo valore le fa girare tutte più in fretta.
+const ROTATION_SPEED = 3;
+
+// Dimensioni relative delle orbite circolari rispetto al raggio della homepage.
+const ORBIT_SIZES = {
+  LEO: 0.60,
+  MEO: 0.80,
+  GEO: 0.955
+};
+
+// Ricorda se la scheda satellite è stata aperta dalla homepage (TUTTE) o dallo zoom di un'orbita.
+let detailFromHome = false;
+
 // Stato della riproduzione automatica della timeline e del trascinamento.
 let playTimer = null;
 let drag = null;
@@ -70,6 +96,11 @@ async function setup() {
   canvas.parent("orbitSurface");
   canvas.id("orbitCanvas");
 
+  // Ridimensiono il canvas ogni volta che cambia la dimensione del suo contenitore.
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => windowResized()).observe(surface);
+  }
+
   // Il disegno viene aggiornato solo quando viene chiamato redraw().
   noLoop();
 
@@ -80,9 +111,10 @@ async function setup() {
   updateTimelineUI();
   updateViewUI();
 
-  // Aspetto il caricamento del font prima di ridisegnare il canvas.
+  // Aspetto il caricamento del font, poi ridisegno il canvas con il font corretto.
   if (document.fonts) {
-    document.fonts.load('9px "IBM Plex Mono Locale"').then(() => redraw());
+    await document.fonts.load('9px "IBM Plex Mono Locale"');
+    redraw();
   }
 
   // Carico direttamente il CSV e attendo che p5.js restituisca la tabella.
@@ -137,6 +169,16 @@ function draw() {
 }
 
 
+// Centro e raggio della homepage: centrata nella superficie e il più grande possibile.
+function homeGeometry() {
+  const cx = width * 0.5;
+  const cy = height * 0.5;
+  const radius = Math.min(width * 0.42, (height * 0.5 - 26) / 0.96);
+
+  return { cx: cx, cy: cy, radius: radius };
+}
+
+
 // Disegna la griglia regolare sullo sfondo del canvas.
 function drawGrid() {
   stroke(111, 142, 136, 17);
@@ -159,10 +201,11 @@ function drawGrid() {
 // ==================================================
 
 function drawOrbits() {
+  // Svuoto le aree dei nomi delle orbite: vengono ricreate a ogni disegno.
+  homeLabels = [];
+
   // Centro della visualizzazione e raggio massimo delle orbite.
-  const cx = width * 0.5;
-  const cy = height * 0.51;
-  const radius = Math.min(width * 0.36, height * 0.465, 350);
+  const { cx, cy, radius } = homeGeometry();
 
   // Dimensioni dell'ellisse HEO.
   const ellipseA = radius * 0.98;
@@ -186,18 +229,32 @@ function drawOrbits() {
     { name: "GEO", size: 0.955 }
   ];
 
-  // Disegno delle orbite circolari e delle rispettive etichette.
+  // Disegno delle orbite circolari e delle relative etichette.
   for (const orbit of orbits) {
     noFill();
+
+    // Cerchio principale dell'orbita.
     stroke("#536461");
     circle(cx, cy, radius * orbit.size * 2);
 
+    // Nome dell'orbita: lo salvo anche come area cliccabile.
+    const labelY = cy - radius * orbit.size - 9;
+
     noStroke();
-    fill("#aab8b4");
+    fill(hoverLabel === orbit.name ? "#e9ed49" : "#aab8b4");
     textFont(MONO);
     textSize(9);
     textAlign(CENTER, BASELINE);
-    text(orbit.name, cx, cy - radius * orbit.size - 9);
+    text(orbit.name, cx, labelY);
+
+    const halfWidth = textWidth(orbit.name) / 2 + 4;
+    homeLabels.push({
+      orbit: orbit.name,
+      x1: cx - halfWidth,
+      x2: cx + halfWidth,
+      y1: labelY - 12,
+      y2: labelY + 4
+    });
   }
 
   // Disegno i punti che rappresentano i satelliti.
@@ -211,11 +268,21 @@ function drawOrbits() {
   const labelY = cy + ex * Math.sin(tilt) + ey * Math.cos(tilt);
 
   noStroke();
-  fill("#99a8a3");
+  fill(hoverLabel === "HEO" ? "#e9ed49" : "#99a8a3");
   textFont(MONO);
   textSize(9);
   textAlign(LEFT, BOTTOM);
   text("HEO", labelX + 6, labelY - 4);
+
+  // Salvo l'area cliccabile del nome HEO.
+  const heoWidth = textWidth("HEO");
+  homeLabels.push({
+    orbit: "HEO",
+    x1: labelX + 2,
+    x2: labelX + 10 + heoWidth,
+    y1: labelY - 16,
+    y2: labelY + 2
+  });
 
   // La Terra è rappresentata dal cerchio centrale.
   fill("#e0e8e5");
@@ -228,30 +295,56 @@ function drawOrbits() {
 // ==================================================
 
 function drawSatellites() {
-  const cx = width * 0.5;
-  const cy = height * 0.51;
-  const radius = Math.min(width * 0.36, height * 0.465, 350);
+  const { cx, cy, radius } = homeGeometry();
 
-  // Recupero solo i satelliti lanciati entro l'anno selezionato.
-  const visible = getVisibleSatellites();
+  // Recupero solo i satelliti lanciati entro l'anno selezionato e del paese scelto.
+  const visible = getVisibleSatellites().filter(matchesCountry);
 
   noStroke();
+
+  // Svuoto l'elenco dei punti: viene ricreato a ogni disegno della homepage.
+  homePoints = [];
+
+  const dotSize = Math.max(2.28, Math.min(2.96, radius / 95));
 
   // Disegno ogni satellite nella posizione calcolata per la sua orbita.
   for (let i = 0; i < visible.length; i++) {
     const sat = visible[i];
-    const point = positionFor(sat, sat.index, cx, cy, radius);
+    const point = avoidLabels(positionFor(sat, sat.index, cx, cy, radius), cx, cy);
+
+    // Salvo la posizione per riconoscere hover e clic sul satellite.
+    homePoints.push({ sat: sat, x: point.x, y: point.y });
+
+    // Anello giallo sul satellite sotto il puntatore, come nello zoom.
+    if (hoverSatellite === sat) {
+      noFill();
+      stroke("#e9ed49");
+      strokeWeight(1);
+      circle(point.x, point.y, 12);
+      noStroke();
+    }
 
     fill(colors[sat.category] || "#d3dad7");
-    circle(
-      point.x,
-      point.y,
-      Math.max(2.28, Math.min(2.96, radius / 95))
-    );
+    circle(point.x, point.y, dotSize);
+  }
+}
+
+
+// Se un satellite cade sopra il nome di un'orbita, lo sposto lungo il suo cerchio
+// finché non è più sopra il nome. Così i nomi restano visibili e cliccabili.
+function avoidLabels(point, cx, cy) {
+  let p = point;
+
+  for (let k = 0; k < 60 && labelAt(p.x, p.y) !== null; k++) {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const angle = Math.atan2(dy, dx) + 0.02;
+    const r = Math.hypot(dx, dy);
+
+    p = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
   }
 
-  // Aggiorno il contatore visibile nella pagina.
-  element("visibleCount").textContent = formatNumber(visible.length);
+  return p;
 }
 
 
@@ -489,10 +582,36 @@ function getVisibleSatellites() {
 }
 
 
+// Vero se il satellite appartiene al paese selezionato (o se è selezionato TUTTI).
+function matchesCountry(satellite) {
+  return selectedCountry === "tutti" || countryGroup(satellite.country) === selectedCountry;
+}
+
+
+// Satelliti da contare nel pannello in alto: quelli dell'anno, filtrati per orbita e per paese.
+// Nuovi filtri (per esempio categoria o paese) si aggiungono qui.
+function getCountedSatellites() {
+  const orbit = currentOrbitFilter();
+
+  return getVisibleSatellites().filter(satellite =>
+    (!orbit || satellite.orbit === orbit) && matchesCountry(satellite)
+  );
+}
+
+
+// Restituisce l'orbita a cui limitare il conteggio: solo quando ne è aperta una.
+function currentOrbitFilter() {
+  if (viewMode === "zoom") return selectedOrbit;
+  if (viewMode === "detail" && !detailFromHome) return selectedOrbit;
+
+  return null;
+}
+
+
 // Costruisce il testo con percentuale e numero assoluto per il pannello categorie.
 function percentText(count, total) {
   const pct = total ? Math.round((count / total) * 100) : 0;
-  return `${pct}% · ${formatNumber(count)}`;
+  return `${pct}% - ${formatNumber(count)}`;
 }
 
 
@@ -521,7 +640,8 @@ function updateStatsPanel() {
   const visible = getVisibleSatellites();
   const total = visible.length;
 
-  element("visibleCount").textContent = formatNumber(total);
+  // Il conteggio in alto segue anno, orbita aperta e gli eventuali altri filtri.
+  element("visibleCount").textContent = formatNumber(getCountedSatellites().length);
 
   // Conteggi per categoria. Un solo ciclo sostituisce i cinque filtri separati.
   const categories = {
@@ -574,6 +694,9 @@ function updateStatsPanel() {
   element("country-russia").textContent = formatNumber(countryCounts.russia);
   element("country-multi").textContent = formatNumber(countryCounts.multi);
   element("country-altro").textContent = formatNumber(countryCounts.altro);
+
+  // La voce TUTTI mostra il totale dei satelliti dell'anno.
+  element("country-tutti").textContent = formatNumber(visible.length);
 }
 
 
@@ -593,17 +716,20 @@ function attachInteractions(canvasElement) {
   // Pulsanti principali e pulsanti per tornare alle viste precedenti.
   element("playButton").addEventListener("click", togglePlaying);
   element("backToOrbits").addEventListener("click", showHome);
-  element("backToZoom").addEventListener("click", () => {
-    openOrbit(selectedOrbit, true);
-  });
+  element("backToZoom").addEventListener("click", goBackFromDetail);
   element("allOrbitButton").addEventListener("click", showHome);
 
-  // Mantengo anche l'attivazione da tastiera già presente per il pulsante TUTTE.
-  element("allOrbitButton").addEventListener("keydown", event => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      showHome();
-    }
+  // Clic su un paese: filtra la visualizzazione e il conteggio. TUTTI annulla il filtro.
+  document.querySelectorAll(".country-list [data-country]").forEach(item => {
+    item.addEventListener("click", () => {
+      setCountry(item.dataset.country);
+    });
+  });
+
+  // La voce HOMEPAGE nel menu in alto riporta alla vista d'insieme di tutte le orbite.
+  element("navHome").addEventListener("click", event => {
+    event.preventDefault();
+    showHome();
   });
 
   // Slider verticale: sposta il punto di osservazione lungo l'orbita selezionata.
@@ -622,14 +748,6 @@ function attachInteractions(canvasElement) {
   document.querySelectorAll(".orbit-key [data-orbit]").forEach(item => {
     item.addEventListener("click", () => {
       openOrbit(item.dataset.orbit);
-    });
-
-    // Mantengo la selezione da tastiera già prevista nel codice originale.
-    item.addEventListener("keydown", event => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openOrbit(item.dataset.orbit);
-      }
     });
   });
 
@@ -682,6 +800,10 @@ function attachInteractions(canvasElement) {
 
     } else if (viewMode === "zoom") {
       showPointHover(loc.x, loc.y);
+
+    } else if (viewMode === "home") {
+      // Nella homepage: hover sui satelliti e sui nomi delle orbite.
+      showHomeHover(loc.x, loc.y);
     }
   });
 
@@ -697,6 +819,22 @@ function attachInteractions(canvasElement) {
     const loc = canvasPoint(event);
 
     if (!wasDrag && viewMode === "home") {
+      // Se il clic cade su un satellite apro la sua pagina, altrimenti scelgo l'orbita.
+      const hitSat = satelliteAt(loc.x, loc.y);
+
+      if (hitSat) {
+        openSatellite(hitSat);
+        return;
+      }
+
+      // Se il clic cade sul nome di un'orbita apro il dettaglio di quell'orbita.
+      const labelOrbit = labelAt(loc.x, loc.y);
+
+      if (labelOrbit) {
+        openOrbit(labelOrbit);
+        return;
+      }
+
       const picked = pickHomeOrbit(loc.x, loc.y);
 
       if (picked) {
@@ -737,7 +875,7 @@ function attachInteractions(canvasElement) {
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
       if (viewMode === "detail") {
-        openOrbit(selectedOrbit, true);
+        goBackFromDetail();
       } else if (viewMode === "zoom") {
         showHome();
       }
@@ -786,7 +924,8 @@ function setYear(year) {
     detailSatellite.year !== null &&
     detailSatellite.year > selectedYear
   ) {
-    viewMode = "zoom";
+    // Torno alla homepage se la scheda era stata aperta da lì, altrimenti allo zoom.
+    viewMode = detailFromHome ? "home" : "zoom";
     detailSatellite = null;
   }
 
@@ -894,6 +1033,9 @@ function openOrbit(orbit, preservePosition = false) {
 function openSatellite(sat) {
   if (!sat) return;
 
+  // Memorizzo da dove arrivo, così il pulsante "indietro" torna nel posto giusto.
+  detailFromHome = viewMode === "home";
+
   detailSatellite = sat;
   viewMode = "detail";
   hideTooltip();
@@ -901,7 +1043,7 @@ function openSatellite(sat) {
   // Riempio i campi della scheda usando i valori letti dal CSV.
   element("detailName").textContent = sat.name;
   element("detailMeta").textContent =
-    `${sat.orbitType || ORBIT_NAMES[sat.orbit] || "ORBITA NON SPECIFICATA"} • ${sat.year || "DATA NON DISPONIBILE"}`;
+    `${sat.orbitType || ORBIT_NAMES[sat.orbit] || "ORBITA NON SPECIFICATA"} - ${sat.year || "DATA NON DISPONIBILE"}`;
 
   element("detailOrbit").textContent = sat.orbit;
   element("detailCategory").textContent = sat.category;
@@ -915,6 +1057,31 @@ function openSatellite(sat) {
 }
 
 
+// Imposta il paese selezionato, evidenzia la voce scelta e aggiorna visualizzazione e conteggi.
+function setCountry(country) {
+  selectedCountry = country;
+
+  document.querySelectorAll(".country-list [data-country]").forEach(item => {
+    item.querySelector("i").classList.toggle("is-active", item.dataset.country === country);
+  });
+
+  // Se è aperta un'orbita, ricostruisco la sua lista con il nuovo filtro.
+  rebuildOrbitList();
+  updateStatsPanel();
+  redraw();
+}
+
+
+// Torna alla vista da cui era stata aperta la scheda: homepage oppure orbita.
+function goBackFromDetail() {
+  if (detailFromHome) {
+    showHome();
+  } else {
+    openOrbit(selectedOrbit, true);
+  }
+}
+
+
 // Aggiorna classi CSS e visibilità degli elementi in base alla vista attiva.
 function updateViewUI() {
   surface.classList.toggle("is-home", viewMode === "home");
@@ -923,6 +1090,15 @@ function updateViewUI() {
 
   element("orbitInteraction").hidden = viewMode !== "zoom";
   element("satelliteDetail").hidden = viewMode !== "detail";
+
+  // Nella scheda satellite nascondo la vista principale e mostro solo la pagina del satellite.
+  element("mainLayout").hidden = viewMode === "detail";
+  document.documentElement.classList.toggle("is-detail-page", viewMode === "detail");
+
+  // Il testo del pulsante indietro cambia in base alla provenienza.
+  element("backToZoom").textContent = detailFromHome
+    ? "← TORNA ALLA HOME"
+    : "← TORNA ALL'ORBITA";
 
   // Evidenzio il pulsante dell'orbita selezionata.
   document.querySelectorAll(".orbit-key [data-orbit]").forEach(item => {
@@ -964,7 +1140,8 @@ function rebuildOrbitList() {
   if (selectedOrbit) {
     orbitList = satellites.filter(satellite =>
       satellite.orbit === selectedOrbit &&
-      (satellite.year === null || satellite.year <= selectedYear)
+      (satellite.year === null || satellite.year <= selectedYear) &&
+      matchesCountry(satellite)
     );
   } else {
     orbitList = [];
@@ -972,12 +1149,6 @@ function rebuildOrbitList() {
 
   orbitPosition = Math.min(orbitPosition, orbitMaxPosition());
   updateOrbitSlider();
-}
-
-
-// Numero di punti di riferimento calcolato in base all'altezza del canvas.
-function orbitVisibleSlots() {
-  return Math.max(24, Math.min(50, Math.round(height / 12)));
 }
 
 
@@ -999,29 +1170,13 @@ function updateOrbitSlider() {
   ).toString();
 
   const fraction = orbitPosition / orbitMaxPosition();
-  const degrees = Math.round(fraction * 360);
-  const slots = zoomVisibleSlots();
-
-  const start = orbitList.length
-    ? Math.round(fraction * Math.max(0, orbitList.length - slots)) + 1
-    : 0;
-
-  const end = Math.min(
-    orbitList.length,
-    Math.max(0, start - 1) + slots
-  );
-
-  // Mostro i gradi e l'intervallo di satelliti attualmente visualizzato.
-  element("orbitProgress").textContent = orbitList.length <= slots
-    ? `${degrees}° / 360° · ${formatNumber(orbitList.length)} SAT.`
-    : `${degrees}° / 360° · ${formatNumber(start)}–${formatNumber(end)} / ${formatNumber(orbitList.length)}`;
-
   // L'icona della mano segue la posizione verticale dello slider.
   const rail = document.querySelector(".orbit-slider-frame");
   const hand = element("orbitHand");
 
   if (rail && hand && rail.clientHeight > 0) {
-    hand.style.top = `${9 + (rail.clientHeight - 18) * fraction}px`;
+    // La barra ha il valore 0 in basso: la manina deve partire dallo stesso lato.
+    hand.style.top = `${9 + (rail.clientHeight - 18) * (1 - fraction)}px`;
   }
 }
 
@@ -1052,10 +1207,94 @@ function zoomGeometry() {
   return {
     cx: width * 0.52,
     cy: height - 8,
-    mainRadius: outerRadius - 58,
-    faintRadius: outerRadius,
-    innerRadius: Math.max(80, outerRadius - 170)
+    mainRadius: outerRadius - 58
   };
+}
+
+
+// Disegna un arco della vista zoom (la metà inferiore di un cerchio) con il raggio indicato.
+function drawGuideArc(g, radius) {
+  beginShape();
+
+  for (let j = 0; j <= 180; j++) {
+    const angle = Math.PI + Math.PI * j / 180;
+    vertex(
+      g.cx + radius * Math.cos(angle),
+      g.cy + radius * Math.sin(angle)
+    );
+  }
+
+  endShape();
+}
+
+
+// Layout fisso della vista zoom, sempre quello della MEO: LEO dentro, MEO al centro, GEO fuori.
+// I raggi sono proporzionali alle dimensioni della homepage, così le orbite restano coerenti.
+function zoomArcs(g) {
+  return [
+    { name: "LEO", radius: g.mainRadius * ORBIT_SIZES.LEO / ORBIT_SIZES.MEO },
+    { name: "MEO", radius: g.mainRadius },
+    { name: "GEO", radius: g.mainRadius * ORBIT_SIZES.GEO / ORBIT_SIZES.MEO }
+  ];
+}
+
+
+// Fascia in cui stanno i satelliti di un'orbita. Va da metà strada dall'arco precedente
+// a metà strada da quello successivo, così non supera mai le altre orbite.
+function zoomBand(orbit, g) {
+  const arcs = zoomArcs(g);
+  let i = arcs.findIndex(arc => arc.name === orbit);
+
+  // Se l'orbita non è una delle tre (per esempio HEO), uso la fascia della MEO.
+  if (i === -1) i = 1;
+
+  const r = arcs[i].radius;
+
+  // Per il primo e l'ultimo arco, il vicino mancante è simmetrico all'altro.
+  const prev = i > 0 ? arcs[i - 1].radius : 2 * r - arcs[i + 1].radius;
+  const next = i < arcs.length - 1 ? arcs[i + 1].radius : 2 * r - arcs[i - 1].radius;
+
+  return {
+    lo: (prev + r) / 2 + 4,
+    // Non vado oltre il bordo superiore del canvas.
+    hi: Math.min((r + next) / 2 - 4, g.cy - 8)
+  };
+}
+
+
+// Sposta un punto lungo la sua circonferenza (intorno a cx, cy) finché non esce dall'area box.
+// Se box è null non fa nulla.
+function avoidBox(x, y, cx, cy, box) {
+  if (!box) return { x: x, y: y };
+
+  let p = { x: x, y: y };
+
+  for (let k = 0; k < 80 && isInBox(p, box); k++) {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const angle = Math.atan2(dy, dx) + 0.02;
+    const r = Math.hypot(dx, dy);
+
+    p = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+  }
+
+  return p;
+}
+
+
+// Vero se il punto è dentro il rettangolo box.
+function isInBox(p, box) {
+  return p.x >= box.x1 && p.x <= box.x2 && p.y >= box.y1 && p.y <= box.y2;
+}
+
+
+// Raggio dell'arco dell'orbita indicata. Se non è una delle tre orbite, usa l'arco centrale.
+function zoomArcRadius(orbit, g) {
+  for (const arc of zoomArcs(g)) {
+    if (arc.name === orbit) return arc.radius;
+  }
+
+  return g.mainRadius;
 }
 
 
@@ -1069,52 +1308,45 @@ function zoomVisibleSlots() {
 function drawZoom(quiet = false) {
   const g = zoomGeometry();
   const guideColor = quiet ? "#334544" : "#8ea3a0";
-  const faintColor = quiet ? "#213130" : "#5f6e6b";
+  // Orbite non selezionate: colore semi-trasparente, così non disturbano i satelliti.
+  const faintColor = quiet ? "rgba(51, 69, 68, 0.3)" : "rgba(142, 163, 160, 0.22)";
   const fraction = orbitPosition / orbitMaxPosition();
 
-  const slots = Math.min(orbitList.length, zoomVisibleSlots());
+  // Numero di satelliti dell'orbita e numero di posizioni mostrate sull'arco.
+  // Ogni orbita ha le stesse posizioni e la stessa rotazione, quindi la velocità è uguale.
+  const count = orbitList.length;
+  const slots = Math.min(count, zoomVisibleSlots());
 
-  // Se i satelliti sono pochi, li distribuisco tutti lungo l'arco e faccio ruotare la posizione.
-  const rotateAll = orbitList.length > 0 && orbitList.length <= zoomVisibleSlots();
-
-  const start = rotateAll
-    ? 0
-    : Math.round(fraction * Math.max(0, orbitList.length - slots));
-
-  const end = rotateAll
-    ? orbitList.length
-    : Math.min(orbitList.length, start + slots);
-
-  // Disegno prima gli archi guida, dal più esterno a quello principale.
+  // Disegno sempre il layout della MEO: LEO dentro, MEO al centro, GEO fuori.
+  // Cambia solo l'arco evidenziato, cioè quello dell'orbita selezionata.
   push();
   noFill();
-  stroke(faintColor);
-  strokeWeight(0.8);
-  beginShape();
 
-  for (let j = 0; j <= 180; j++) {
-    const angle = Math.PI + Math.PI * j / 180;
-    vertex(
-      g.cx + g.faintRadius * Math.cos(angle),
-      g.cy + g.faintRadius * Math.sin(angle)
-    );
+  if (selectedOrbit !== "HEO") {
+    // Archi non selezionati: sfumati.
+    stroke(faintColor);
+    strokeWeight(0.8);
+
+    for (const arc of zoomArcs(g)) {
+      if (arc.name !== selectedOrbit) {
+        drawGuideArc(g, arc.radius);
+      }
+    }
+
+    // Arco dell'orbita selezionata: pieno e più visibile.
+    stroke(guideColor);
+    strokeWeight(1.3);
+    drawGuideArc(g, zoomArcRadius(selectedOrbit, g));
+
+  } else {
+    // HEO: solo un arco principale tratteggiato.
+    stroke(guideColor);
+    strokeWeight(1.3);
+    drawingContext.setLineDash([4, 6]);
+    drawGuideArc(g, g.mainRadius);
+    drawingContext.setLineDash([]);
   }
 
-  endShape();
-
-  stroke(guideColor);
-  strokeWeight(1.3);
-  beginShape();
-
-  for (let j = 0; j <= 180; j++) {
-    const angle = Math.PI + Math.PI * j / 180;
-    vertex(
-      g.cx + g.mainRadius * Math.cos(angle),
-      g.cy + g.mainRadius * Math.sin(angle)
-    );
-  }
-
-  endShape();
   pop();
 
   // L'etichetta dell'orbita non viene disegnata sopra la scheda di dettaglio.
@@ -1124,7 +1356,7 @@ function drawZoom(quiet = false) {
     textFont(MONO);
     textSize(10);
     textAlign(CENTER, BOTTOM);
-    text(selectedOrbit, g.cx, g.cy - g.mainRadius - 8);
+    text(selectedOrbit, g.cx, g.cy - zoomArcRadius(selectedOrbit, g) - 8);
   }
 
   // Svuoto i punti precedenti: l'elenco verrà ricreato durante questo disegno.
@@ -1133,36 +1365,64 @@ function drawZoom(quiet = false) {
   // Se non ci sono satelliti nell'anno selezionato, mostro il messaggio centrale.
   if (!orbitList.length) {
     if (!quiet) {
+      // Messaggio su due righe, centrato sul centro dell'arco.
+      // Posizionato a metà raggio: non tocca l'etichetta dell'orbita in alto né l'arco esterno.
+      const msgY = g.cy - g.mainRadius * 0.45;
+
       noStroke();
       fill("#b4c4c0");
       textFont(MONO);
       textSize(11);
       textAlign(CENTER, CENTER);
-      text(
-        "NESSUN SATELLITE PER L'ANNO SELEZIONATO",
-        width * 0.5,
-        height * 0.46
-      );
+      text("NESSUN SATELLITE", g.cx, msgY - 8);
+      text("PER L'ANNO SELEZIONATO", g.cx, msgY + 8);
     }
 
     return;
   }
 
-  // Disegno i satelliti presenti nell'intervallo corrente.
-  for (let idx = start; idx < end; idx++) {
-    const sat = orbitList[idx];
-    const local = idx - start;
+  // Fascia radiale in cui si distribuiscono i satelliti dell'orbita selezionata.
+  const band = zoomBand(selectedOrbit, g);
 
-    // Calcolo la posizione angolare lungo la metà inferiore dell'arco.
-    const t = rotateAll
-      ? (((local + 0.5) / slots + fraction) % 1)
-      : (slots <= 1 ? 0.5 : local / (slots - 1));
+  // Area occupata dalla scritta con il nome dell'orbita: i satelliti non ci devono entrare.
+  let labelBox = null;
+
+  if (!quiet && selectedOrbit) {
+    textFont(MONO);
+    textSize(10);
+
+    const labelY = g.cy - zoomArcRadius(selectedOrbit, g) - 8;
+    const halfWidth = textWidth(selectedOrbit) / 2 + 6;
+
+    labelBox = {
+      x1: g.cx - halfWidth,
+      x2: g.cx + halfWidth,
+      y1: labelY - 16,
+      y2: labelY + 4
+    };
+  }
+
+  // Disegno i satelliti presenti nell'intervallo corrente.
+  for (let local = 0; local < slots; local++) {
+    // Scelgo un satellite della lista in modo uniforme: se sono molti ne mostro un sottoinsieme distribuito.
+    const sat = orbitList[Math.floor((local + 0.5) * count / slots)];
+
+    // Posizione angolare lungo la metà inferiore dell'arco: stessa rotazione per tutte le orbite.
+    const t = ((local + 0.5) / slots + fraction * ROTATION_SPEED) % 1;
 
     const angle = Math.PI + Math.PI * t;
-    const radialMix = 0.08 + 0.78 * randomFixed(sat.index, 4);
-    const radius = g.innerRadius + (g.mainRadius - g.innerRadius) * radialMix;
-    const x = g.cx + radius * Math.cos(angle);
-    const y = g.cy + radius * Math.sin(angle);
+    // Il satellite va in un punto sparso nella fascia, sia dentro sia fuori il suo arco.
+    const radius = band.lo + (band.hi - band.lo) * randomFixed(sat.index, 4);
+    // Se il punto cade sulla scritta dell'orbita lo sposto lungo il suo arco.
+    const placed = avoidBox(
+      g.cx + radius * Math.cos(angle),
+      g.cy + radius * Math.sin(angle),
+      g.cx,
+      g.cy,
+      labelBox
+    );
+    const x = placed.x;
+    const y = placed.y;
 
     // Salvo la posizione per poter riconoscere hover e clic sul satellite.
     zoomPoints.push({
@@ -1201,10 +1461,12 @@ function drawZoom(quiet = false) {
 
 // Restituisce il satellite più vicino al punto indicato, entro 12 pixel.
 function satelliteAt(x, y) {
+  // Nella homepage uso i punti delle orbite generali, altrimenti quelli dello zoom.
+  const points = viewMode === "home" ? homePoints : zoomPoints;
   let best = null;
   let distance = 12;
 
-  for (const point of zoomPoints) {
+  for (const point of points) {
     const d = Math.hypot(x - point.x, y - point.y);
 
     if (d < distance) {
@@ -1236,12 +1498,18 @@ function showPointHover(x, y) {
     return;
   }
 
+  // Prima riga: nome del satellite.
   tooltip.replaceChildren(document.createTextNode(sat.name));
 
-  const meta = document.createElement("span");
-  meta.textContent =
-    `${sat.category.toUpperCase()} · ${sat.year || "ANNO N.D."} · CLICCA PER DETTAGLIO`;
-  tooltip.appendChild(meta);
+  // Seconda riga: tipologia e anno.
+  const info = document.createElement("span");
+  info.textContent = `${sat.category.toUpperCase()} - ${sat.year || "ANNO N.D."}`;
+  tooltip.appendChild(info);
+
+  // Terza riga: invito a cliccare per aprire il dettaglio.
+  const action = document.createElement("span");
+  action.textContent = "CLICCA PER DETTAGLIO";
+  tooltip.appendChild(action);
 
   // Evito che il tooltip esca dai bordi del canvas.
   tooltip.style.left = `${Math.min(width - 245, x + 16)}px`;
@@ -1250,8 +1518,31 @@ function showPointHover(x, y) {
 }
 
 
+// Nella homepage gestisce l'hover sui satelliti e quello giallo sul nome delle orbite.
+function showHomeHover(x, y) {
+  showPointHover(x, y);
+
+  const label = labelAt(x, y);
+
+  if (label !== hoverLabel) {
+    hoverLabel = label;
+    redraw();
+  }
+
+  // Sul nome dell'orbita il cursore diventa una manina.
+  if (label) {
+    element("orbitCanvas").style.cursor = "pointer";
+  }
+}
+
+
 // Nasconde il tooltip e rimuove l'evidenziazione del satellite.
 function hideTooltip() {
+  if (hoverLabel !== null) {
+    hoverLabel = null;
+    redraw();
+  }
+
   if (element("orbitTooltip")) {
     element("orbitTooltip").hidden = true;
   }
@@ -1283,11 +1574,21 @@ function canvasPoint(event) {
 // SELEZIONE DELLE ORBITE NELLA HOMEPAGE
 // ==================================================
 
+// Restituisce il nome dell'orbita se il puntatore è sopra il suo nome nella homepage.
+function labelAt(x, y) {
+  for (const box of homeLabels) {
+    if (x >= box.x1 && x <= box.x2 && y >= box.y1 && y <= box.y2) {
+      return box.orbit;
+    }
+  }
+
+  return null;
+}
+
+
 // Capisce quale orbita è stata cliccata nella vista generale.
 function pickHomeOrbit(x, y) {
-  const cx = width * 0.5;
-  const cy = height * 0.51;
-  const radius = Math.min(width * 0.36, height * 0.465, 350);
+  const { cx, cy, radius } = homeGeometry();
 
   const dx = x - cx;
   const dy = y - cy;

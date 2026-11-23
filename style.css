@@ -1,6 +1,4 @@
-/* ======APPUNTI=========================
-    Capire cosa fare con le media queries, quando è troppo picolo?
-   ================================================== */
+/* Foglio di stile di SATELLITI: colori, font, layout, timeline e schede. */
 
 
 
@@ -159,7 +157,7 @@ button {
   background: var(--surface);
 }
 
-#orbitCanvas { /* da sistemare, il canvas non arriva a riempire tutta la superficie, ma si ferma prima. */
+#orbitCanvas { /* Il canvas riempie tutta la superficie che lo contiene. */
   position: absolute;
   top: 0;
   left: 0;
@@ -177,18 +175,18 @@ button {
   background: linear-gradient(to bottom, rgba(0,0,0,.04), rgba(0,0,0,.09));
 }
 
-/* Note in basso a sinistra e a destra della superficie. NON SO SE TOGLIERLO */
+/* Note fisse ai bordi della superficie (ora in alto a destra). */
 .surface-note {
   position: absolute;
   z-index: 3;
-  bottom: 10px;
+  top: 12px;
   font-size: 10px;
   color: #bbc6c3;
   letter-spacing: .04em;
 }
 
 .surface-note-sides {
-  left: 24px;
+  right: 24px;
 }
 
 
@@ -328,8 +326,9 @@ button {
   gap: 12px;
 }
 
+/* Colonne: pallino, nome del paese e numero allineato a destra. */
 .country-list > div {
-  grid-template-columns: 14px 1fr;
+  grid-template-columns: 14px 1fr auto;
   gap: 10px;
   font-size: 10px;
   color: #c6d1ce;
@@ -349,6 +348,7 @@ button {
 }
 
 .country-list em {
+  justify-self: end;
   font-style: normal;
   color: #a4b2ae;
 }
@@ -417,7 +417,12 @@ button {
   appearance: none;
   width: 100%;
   height: 2px;
-  background: var(--yellow);
+  /* Gradiente: giallo fino all'anno selezionato (--progress, impostata dal JS), grigio dopo. */
+  background: linear-gradient(
+    to right,
+    var(--yellow) var(--progress, 0%),
+    var(--line) var(--progress, 0%)
+  );
   border-radius: 0;
 }
 
@@ -439,9 +444,10 @@ button {
   border: 2px solid var(--yellow);
 }
 
+/* In Firefox la traccia resta trasparente, così si vede il gradiente dell'input. */
 #yearSlider::-moz-range-track {
   height: 2px;
-  background: var(--yellow);
+  background: transparent;
 }
 
 /* Tacche e anni di riferimento sotto la timeline. */
@@ -486,10 +492,6 @@ button {
   left: 100%;
 }
 
-.year-ticks > span:last-child {
-  color: var(--yellow);
-  font-family: var(--display);
-}
 
 /* ==================================================
    STATI DELLA VISUALIZZAZIONE DELLE ORBITE
@@ -625,7 +627,7 @@ button {
 
 
 /* ==================================================
-    PROVVISORIO MA DA RIUTILIZZARE
+    TOOLTIP E SCHEDA SATELLITE
    ================================================== */
 /* Tooltip del satellite, posizionato dal JavaScript in base al puntatore. */
 .orbit-tooltip {
@@ -648,19 +650,12 @@ button {
   font-size: 9px;
 }
 
-/* Scheda informativa del satellite selezionato. */
-.satellite-detail {
-  position: absolute;
-  z-index: 5;
-  left: clamp(72px, 8%, 112px);
-  top: 50%;
-  transform: translateY(-50%);
-  width: min(730px, calc(100% - 370px));
-  max-height: calc(100% - 35px);
-  overflow: auto;
-  background: rgba(11, 19, 20, .98);
-  border: 1px solid #374b48;
-  padding: clamp(18px, 2.5vw, 36px);
+/* Pagina a tutta larghezza del singolo satellite (non più un pannello sopra il canvas). */
+.satellite-page {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 28px 48px;
 }
 
 .satellite-eyebrow {
@@ -670,7 +665,7 @@ button {
   letter-spacing: .04em;
 }
 
-.satellite-detail h2 {
+.satellite-page h2 {
   margin: 0 0 12px;
   font: 600 clamp(25px, 3.4vw, 56px)/1.06 var(--display);
   letter-spacing: -.025em;
@@ -861,7 +856,7 @@ button {
   }
 
   .country-list > div {
-    grid-template-columns: 11px 1fr;
+    grid-template-columns: 11px 1fr auto;
     gap: 7px;
     font-size: 9px;
     line-height: 1.1;
@@ -1037,4 +1032,39 @@ button {
   .orbit-scroll-hint {
     line-height: 1.4;
   }
+}
+
+/* Quando si apre la pagina del satellite, html e body possono scorrere e non hanno altezza fissa. */
+html.is-detail-page,
+html.is-detail-page body {
+  overflow: auto;
+  height: auto;
+}
+
+/* Voci del menu paesi: cliccabili, con evidenza gialla al passaggio del puntatore. */
+.country-list > div {
+  cursor: pointer;
+}
+
+.country-list > div:hover span,
+.country-list > div:hover em {
+  color: var(--yellow);
+}
+
+/* Controlli dell'orbita: la scritta e la barra di scorrimento vanno in alto a destra,
+   sotto la nota "1 PUNTO = 1 SATELLITE". Il pulsante indietro e il nome dell'orbita restano a sinistra. */
+.orbit-interaction {
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 24px 0 18px;
+}
+
+.orbit-scroll-controls {
+  position: absolute;
+  top: 40px;
+  right: 24px;
+  margin-top: 0;
+  align-items: flex-end;
+  text-align: right;
 }
