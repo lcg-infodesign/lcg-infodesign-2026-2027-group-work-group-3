@@ -1,0 +1,43 @@
+  <!--Ripreso dal popup -->
+  <!-- Scheda del singolo satellite: pagina a tutta larghezza mostrata al posto della homepage. -->
+  <article
+            <button class="orbit-back" id="backToZoom" type="button">
+              ← TORNA ALL'ORBITA
+            </button>
+
+            <p class="satellite-eyebrow">SCHEDA SATELLITE / ANTEPRIMA</p>
+            <h2 id="detailName"></h2>
+            <p class="satellite-meta" id="detailMeta"></p>
+
+            <!-- I campi vengono riempiti dal JavaScript con i valori del CSV. -->
+            <dl class="satellite-fields">
+              <div>
+                <dt>ORBITA</dt>
+                <dd id="detailOrbit"></dd>
+              </div>
+              <div>
+                <dt>TIPOLOGIA D'USO</dt>
+                <dd id="detailCategory"></dd>
+              </div>
+              <div>
+                <dt>DATA DI LANCIO</dt>
+                <dd id="detailLaunch"></dd>
+              </div>
+              <div>
+                <dt>PAESE OPERATORE</dt>
+                <dd id="detailCountry"></dd>
+              </div>
+              <div>
+                <dt>OPERATORE</dt>
+                <dd id="detailOperator"></dd>
+              </div>
+              <div>
+                <dt>FUNZIONE</dt>
+                <dd id="detailPurpose"></dd>
+              </div>
+            </dl>
+
+            <p class="satellite-draft-note">
+              Dati provenienti dal CSV originale. Visualizzazione di dettaglio in bozza.
+            </p>
+          </article>
