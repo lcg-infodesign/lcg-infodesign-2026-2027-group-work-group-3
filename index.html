@@ -1,7 +1,5 @@
 <!doctype html>
 <html lang="it">
-  <!-- Struttura della pagina SATELLITI: barra superiore, orbite, pannelli e timeline.
-       Il disegno delle orbite è in sketch.js; lo stile è in style.css. -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,7 +15,7 @@
 </head>
 
 <body>
-  <!-- Barra superiore con nome del progetto e collegamenti di navigazione. -->
+  <!-- Barra superiore con nome del progetto e collegamenti di navigazione -->
   <header class="topbar" id="top">
     <div class="brand">
       <span class="brand-symbol">✳</span>
@@ -32,10 +30,10 @@
   </header>
 
   <main class="layout" id="mainLayout">
-    <!-- Area principale: visualizzazione delle orbite e pannello informativo. -->
+    <!-- visualizzazione delle orbite e pannello informativo -->
     <section class="visual">
       <div class="visual-main">
-        <!-- Il canvas p5 viene creato e inserito dentro questo contenitore. -->
+        <!-- Il canvas viene creato e inserito dentro questo contenitore. -->
         <div class="orbit-surface" id="orbitSurface">
 
           <!-- Controlli mostrati quando si entra nella visualizzazione di una singola orbita. -->
@@ -46,6 +44,7 @@
 
             <div class="orbit-active-label" id="zoomOrbitLabel">
               LEO <span>LOW EARTH</span>
+              <span>160 - 2000 km</span>
             </div>
 
             <div class="orbit-scroll-controls" id="orbitScrollControls">
@@ -91,8 +90,10 @@
           <div class="orbit-tooltip" id="orbitTooltip" hidden></div>
 
           <!-- Note fisse collocate ai due lati inferiori della visualizzazione. -->
-          <div class="surface-note surface-note-sides">1 PUNTO = 1 SATELLITE</div>
-        </div>
+          <div class="surface-note surface-note-sides">1 PUNTO = 1 SATELLITE <br> 
+           
+        </div> 
+        </div> 
       </div>
 
       <!-- Pannello laterale con conteggi, categorie, orbite e paesi. -->
