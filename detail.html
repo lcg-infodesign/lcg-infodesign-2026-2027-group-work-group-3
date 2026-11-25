@@ -1,0 +1,132 @@
+ <!doctype html>
+<html lang="it">
+  <!-- Struttura della pagina SATELLITI: barra superiore, orbite, pannelli e timeline.
+       Il disegno delle orbite è in sketch.js; lo stile è in style.css. -->
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090e0f">
+  <meta name="description" content="SATELLITI — Visualizzazione dei satelliti operativi">
+
+  <title>SATELLITI</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/p5@2.4.0/lib/p5.min.js" defer></script>
+  <script src="sketch.js" defer></script>
+</head>
+
+<body>
+  <!-- Barra superiore con nome del progetto e collegamenti di navigazione. -->
+  <header class="topbar" id="top">
+    <div class="brand">
+      <span class="brand-symbol">✳</span>
+      SATELLITI
+    </div>
+
+    <nav class="topnav">
+      <a href="#top" id="navHome">HOMEPAGE</a>
+      <a href="#">ABOUT</a>
+      <a href="#">TEAM</a>
+    </nav>
+  </header>
+
+  <main class="layout" id="mainLayout">
+    <!-- Area principale: visualizzazione delle orbite e pannello informativo. -->
+    
+    <!--Ripreso dal popup -->
+  <!-- Scheda del singolo satellite: pagina a tutta larghezza mostrata al posto della homepage. -->
+  <article
+            <button class="orbit-back" id="backToZoom" type="button">
+              ← TORNA ALL'ORBITA
+            </button>
+
+            <p class="satellite-eyebrow">SCHEDA SATELLITE / ANTEPRIMA</p>
+            <h2 id="detailName"></h2>
+            <p class="satellite-meta" id="detailMeta"></p>
+
+            <!-- I campi vengono riempiti dal JavaScript con i valori del CSV. -->
+            <dl class="satellite-fields">
+              <div>
+                <dt>ORBITA</dt>
+                <dd id="detailOrbit"></dd>
+              </div>
+              <div>
+                <dt>TIPOLOGIA D'USO</dt>
+                <dd id="detailCategory"></dd>
+              </div>
+              <div>
+                <dt>DATA DI LANCIO</dt>
+                <dd id="detailLaunch"></dd>
+              </div>
+              <div>
+                <dt>PAESE OPERATORE</dt>
+                <dd id="detailCountry"></dd>
+              </div>
+              <div>
+                <dt>OPERATORE</dt>
+                <dd id="detailOperator"></dd>
+              </div>
+              <div>
+                <dt>FUNZIONE</dt>
+                <dd id="detailPurpose"></dd>
+              </div>
+            </dl>
+
+            <p class="satellite-draft-note">
+              Dati provenienti dal CSV originale. Visualizzazione di dettaglio in bozza.
+            </p>
+          </article>
+      
+  </main>
+
+
+</body>
+</html>
+ 
+ 
+ 
+ 
+ <!--Ripreso dal popup -->
+  <!-- Scheda del singolo satellite: pagina a tutta larghezza mostrata al posto della homepage. -->
+  <article
+            <button class="orbit-back" id="backToZoom" type="button">
+              ← TORNA ALL'ORBITA
+            </button>
+
+            <p class="satellite-eyebrow">SCHEDA SATELLITE / ANTEPRIMA</p>
+            <h2 id="detailName"></h2>
+            <p class="satellite-meta" id="detailMeta"></p>
+
+            <!-- I campi vengono riempiti dal JavaScript con i valori del CSV. -->
+            <dl class="satellite-fields">
+              <div>
+                <dt>ORBITA</dt>
+                <dd id="detailOrbit"></dd>
+              </div>
+              <div>
+                <dt>TIPOLOGIA D'USO</dt>
+                <dd id="detailCategory"></dd>
+              </div>
+              <div>
+                <dt>DATA DI LANCIO</dt>
+                <dd id="detailLaunch"></dd>
+              </div>
+              <div>
+                <dt>PAESE OPERATORE</dt>
+                <dd id="detailCountry"></dd>
+              </div>
+              <div>
+                <dt>OPERATORE</dt>
+                <dd id="detailOperator"></dd>
+              </div>
+              <div>
+                <dt>FUNZIONE</dt>
+                <dd id="detailPurpose"></dd>
+              </div>
+            </dl>
+
+            <p class="satellite-draft-note">
+              Dati provenienti dal CSV originale. Visualizzazione di dettaglio in bozza.
+            </p>
+          </article>
