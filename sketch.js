@@ -137,11 +137,7 @@ async function setup() {
     // Mostro un messaggio chiaro se il CSV non viene caricato o letto.
     console.error("Errore durante il caricamento del CSV:", error);
 
-    alert(
-      "Non riesco a caricare il CSV.\n" +
-      "Controlla che il file si chiami satelliti.csv " +
-      "e si trovi nella cartella assets."
-    );
+
   }
 }
 
